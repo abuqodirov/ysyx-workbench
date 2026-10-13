@@ -27,3 +27,4 @@ icsprout55-pdk/
 verilator/
 !my-patches/
 !my-patches/**
+!SETUP.md
