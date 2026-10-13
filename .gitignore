@@ -25,3 +25,5 @@ obj_*/
 npc/auto_bind.cpp
 icsprout55-pdk/
 verilator/
+!my-patches/
+!my-patches/**

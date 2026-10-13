@@ -1,0 +1,13 @@
+diff --git a/src/config.h b/src/config.h
+index 046b066..e50af0c 100644
+--- a/src/config.h
++++ b/src/config.h
+@@ -1,7 +1,7 @@
+ #ifndef __CONFIG_H__
+ #define __CONFIG_H__
+ 
+-#define HAS_GUI
++//#define HAS_GUI
+ #define SIZE_OPT
+ 
+ #define SOUND_NONE 0

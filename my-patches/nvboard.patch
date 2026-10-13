@@ -1,0 +1,175 @@
+diff --git a/src/font.cpp b/src/font.cpp
+index d1dcbeb..b6b0325 100644
+--- a/src/font.cpp
++++ b/src/font.cpp
+@@ -18,8 +18,14 @@ void init_font(SDL_Renderer *renderer) {
+   nvboard_texture = str2texture(renderer, "NVBoard", 0xffffff, BOARD_BG_COLOR);
+ 
+   TTF_SetFontSize(font, CH_HEIGHT);
+-  SDL_Color fg = {.r = 0x00, .g = 0x00, .b = 0x00 };
+-  SDL_Color bg = {.r = 0xff, .g = 0xff, .b = 0xff };
++  // .a MUST be set explicitly. SDL_Color is {r,g,b,a}, so omitting .a leaves it
++  // 0 = fully transparent. Modern SDL_ttf honours that in TTF_Render*_Shaded
++  // (it copies the alpha into the palette and turns on SDL_BLENDMODE_BLEND),
++  // so every glyph texture renders invisibly. The Blended renderer used for the
++  // board labels has a "a==0 means opaque" compatibility hack; Shaded does not,
++  // which is why only the UART terminal came out blank.
++  SDL_Color fg = {.r = 0x00, .g = 0x00, .b = 0x00, .a = 0xff };
++  SDL_Color bg = {.r = 0xff, .g = 0xff, .b = 0xff, .a = 0xff };
+   for (int i = 1; i < 128; i ++) {
+     SDL_Surface *s = TTF_RenderGlyph_Shaded(font, i, fg, bg);
+     assert(s->w == CH_WIDTH);
+@@ -36,8 +42,8 @@ SDL_Surface* str2surface(const char *str, uint32_t fg) {
+ }
+ 
+ SDL_Surface* str2surface(const char *str, uint32_t fg, uint32_t bg) {
+-  SDL_Color c_fg = {.r = (uint8_t)(fg >> 16), .g = (uint8_t)(fg >> 8), .b = (uint8_t)fg };
+-  SDL_Color c_bg = {.r = (uint8_t)(bg >> 16), .g = (uint8_t)(bg >> 8), .b = (uint8_t)bg };
++  SDL_Color c_fg = {.r = (uint8_t)(fg >> 16), .g = (uint8_t)(fg >> 8), .b = (uint8_t)fg, .a = 0xff };
++  SDL_Color c_bg = {.r = (uint8_t)(bg >> 16), .g = (uint8_t)(bg >> 8), .b = (uint8_t)bg, .a = 0xff };
+   SDL_Surface *s = TTF_RenderText_Shaded_Wrapped(font, str, c_fg, c_bg, 0);
+   assert(s != NULL);
+   return s;
+@@ -59,8 +65,8 @@ SDL_Surface* ch2surface(uint8_t ch, uint32_t fg) {
+ }
+ 
+ SDL_Surface* ch2surface(uint8_t ch, uint32_t fg, uint32_t bg) {
+-  SDL_Color c_fg = {.r = (uint8_t)(fg >> 16), .g = (uint8_t)(fg >> 8), .b = (uint8_t)fg };
+-  SDL_Color c_bg = {.r = (uint8_t)(bg >> 16), .g = (uint8_t)(bg >> 8), .b = (uint8_t)bg };
++  SDL_Color c_fg = {.r = (uint8_t)(fg >> 16), .g = (uint8_t)(fg >> 8), .b = (uint8_t)fg, .a = 0xff };
++  SDL_Color c_bg = {.r = (uint8_t)(bg >> 16), .g = (uint8_t)(bg >> 8), .b = (uint8_t)bg, .a = 0xff };
+   SDL_Surface *s = TTF_RenderGlyph_Shaded(font, ch, c_fg, c_bg);
+   assert(s != NULL);
+   return s;
+diff --git a/src/term.cpp b/src/term.cpp
+index 25587a3..b2c8251 100644
+--- a/src/term.cpp
++++ b/src/term.cpp
+@@ -1,5 +1,7 @@
+ #include <nvboard.h>
+ #include <term.h>
++#include <stdlib.h>
++#include <stdio.h>
+ 
+ Term::Term(SDL_Renderer *r, int x, int y, int w, int h):
+     renderer(r), cursor_x(0), cursor_y(0), screen_y(0) {
+@@ -104,7 +106,13 @@ void Term::backspace(bool is_input) {
+ }
+ 
+ void Term::feed_ch(uint8_t ch) {
+-  assert(ch < 128);
++	// NVBOARD_UART_DEBUG=1 echoes everything NVBoard decodes, so the shell shows
++	// whether the serial link works even when the window is not visible long enough.
++	static const bool dbg = (getenv("NVBOARD_UART_DEBUG") != NULL);
++	if (dbg) fprintf(stderr, "[nvboard-uart] rx 0x%02x '%c'\n", ch,
++	                 (ch >= 32 && ch < 127) ? ch : '.');
++	// Never abort on a bad byte: a wrong divisor is a bug to see, not to crash on.
++	if (ch >= 128) { return; }
+   if (is_cursor_on_screen()) set_dirty_char(cursor_y - screen_y, cursor_x);
+   int y = cursor_y;
+   assert(y < lines.size());
+@@ -140,6 +148,14 @@ void Term::draw_cursor() {
+ }
+ 
+ void Term::update_gui() {
++  static const bool dbg = (getenv("NVBOARD_UART_DEBUG") != NULL);
++  static int n = 0;
++  if (dbg && n < 40) {
++    n++;
++    fprintf(stderr, "[nvboard-term] update_gui dirty_screen=%d lines=%d cursor=(%d,%d) screen_y=%d wh_in_char=(%d,%d)\n",
++            (int)dirty_screen, (int)lines.size(), cursor_x, cursor_y, screen_y,
++            w_in_char, h_in_char);
++  }
+   if (!dirty_screen) return;
+   SDL_Rect rect = region;
+   int x_start = rect.x;
+diff --git a/src/uart.cpp b/src/uart.cpp
+index 64768a2..3bd30e3 100644
+--- a/src/uart.cpp
++++ b/src/uart.cpp
+@@ -1,5 +1,7 @@
+ #include <nvboard.h>
+ #include <uart.h>
++#include <stdlib.h>
++#include <stdio.h>
+ 
+ // There is no need to update TX too frequently
+ #define UART_TX_FPS 5
+@@ -10,17 +12,31 @@ bool is_uart_rx_idle = true;
+ 
+ UART::UART(SDL_Renderer *rend, int cnt, int init_val, int ct, int x, int y, int w, int h):
+     Component(rend, cnt, init_val, ct),
+-    tx_state(0), rx_state(0), divisor(16), need_update_gui(false) {
++    // 208 = 16 x 13, where 13 is the UART16550 divisor latch value the ysyxSoC
++    // loader programs for 25MHz / 115200 (25e6 / (16*115200) = 13.56, truncated).
++    // The 16550 register counts clocks per oversample; NVBoard counts clocks per
++    // bit, hence the factor of 16. Measured directly off externalPins_uart0_tx.
++    tx_state(0), rx_state(0), divisor(208), need_update_gui(false) {
+   term = new Term(rend, x, y, w, h);
+ 
+   SDL_Rect *rect_ptr = new SDL_Rect;
+   *rect_ptr = (SDL_Rect){x, y, w, h};
+   set_rect(rect_ptr, 0);
+ 
++  // Allow the divisor to be overridden at run time so testing a different
++  // baud rate does not require rebuilding the NVBoard archive.
++  const char *env_div = getenv("NVBOARD_UART_DIVISOR");
++  if (env_div != NULL) {
++    int d = atoi(env_div);
++    if (d > 0) divisor = (uint16_t)d;
++  }
++  fprintf(stderr, "[nvboard-uart] divisor = %u cycles/bit\n", divisor);
++
+   uart_divisor_cnt = divisor - 1;
+   int len = pin_array[UART_TX].vector_len;
+   assert(len == 0 || len == 1); // either unbound or bound to 1 bit signal
+   p_tx = (uint8_t *)pin_array[UART_TX].ptr;
++  fprintf(stderr, "[nvboard-uart] UART_TX vector_len=%d ptr=%p\n", len, (void *)p_tx);
+ 
+   SDL_SetRenderDrawColor(rend, 0x00, 0x00, 0x00, 0);
+   SDL_RenderDrawLine(rend, x, y + h, x + w, y + h);
+@@ -28,6 +44,16 @@ UART::UART(SDL_Renderer *rend, int cnt, int init_val, int ct, int x, int y, int
+ 
+   rx_sending_str = "";
+   pin_poke(UART_RX, 1);
++
++  // NVBOARD_TERM_TEST=1: push a string straight into the terminal at startup,
++  // bypassing the UART entirely. If this shows up in the window, the whole
++  // render path works and the fault is in the UART -> term timing. If it does
++  // not, rendering is broken independently of anything we wired up.
++  if (getenv("NVBOARD_TERM_TEST") != NULL) {
++    term->feed_str("NVBOARD TERMINAL SELF TEST 0123456789\n");
++    need_update_gui = true;
++    fprintf(stderr, "[nvboard-term] self test string fed\n");
++  }
+ }
+ 
+ UART::~UART() {
+@@ -41,6 +67,17 @@ void UART::tx_receive() {
+   uart_divisor_cnt = divisor - 1;
+ 
+   uint8_t tx = *p_tx;
++
++  // Diagnostic (NVBOARD_UART_DEBUG=1): show the first samples that are not
++  // "idle line, idle state". If this never fires, the TX pin never goes low as
++  // far as NVBoard can see -- i.e. the pin binding is wrong, not the divisor.
++  static const bool dbg = (getenv("NVBOARD_UART_DEBUG") != NULL);
++  static int dbg_left = 60;
++  if (dbg && dbg_left > 0 && (tx == 0 || tx_state != 0)) {
++    dbg_left--;
++    fprintf(stderr, "[nvboard-uart] sample tx=%u state=%d\n", tx, tx_state);
++  }
++
+   if (tx_state == 0) { // idle
+     if (!tx) { // start bit
+       tx_data = 0;
+@@ -85,6 +122,9 @@ void UART::rx_getchar(uint8_t ch) {
+ }
+ 
+ void UART::update_state() {
++  static const bool dbg = (getenv("NVBOARD_UART_DEBUG") != NULL);
++  static int n = 0;
++  if (dbg && n < 40) { n++; fprintf(stderr, "[nvboard-uart] update_state need_gui=%d\n", (int)need_update_gui); }
+   if (need_update_gui) {
+     static uint64_t last = 0;
+     uint64_t now = nvboard_get_time();

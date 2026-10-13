@@ -1,0 +1,13 @@
+diff --git a/bench/202.llama2/am.filelist b/bench/202.llama2/am.filelist
+index b094467..ab242b7 100644
+--- a/bench/202.llama2/am.filelist
++++ b/bench/202.llama2/am.filelist
+@@ -1,5 +1,5 @@
+ input/tok512.bin
+-input/test.model
++#input/test.model
+ input/train.model
+-input/ref.model
+-input/huge.model
++#input/ref.model
++#input/huge.model

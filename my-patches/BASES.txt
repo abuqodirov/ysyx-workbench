@@ -1,0 +1,5 @@
+am-kernels git@github.com:NJU-ProjectN/am-kernels.git 9c433f7cf4b4e05d09543bf7e269b23502d1b2b6
+archbench git@github.com:OSCPU/archbench.git 52034e3c65e973cab0af7d2e6e614e6d4470cf86
+fceux-am git@github.com:NJU-ProjectN/fceux-am.git d5524ba624300869d6c793f01e6632e4dc3066ef
+nvboard git@github.com:NJU-ProjectN/nvboard.git 4b11dedf1e8a568ad7f74aa68557648b679a9264
+ysyxSoC git@github.com:OSCPU/ysyxSoC.git a74c903dd6e7f56b4f4a3bf2f01b75e2868cfabc
