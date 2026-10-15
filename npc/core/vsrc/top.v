@@ -38,7 +38,7 @@ module top #(
         wire [31:0] inst = inst_reg;
 
         assign io_ifu_addr = pc;
-        assign io_ifu_reqValid = (current_state == STATE_FETCH);
+        assign io_ifu_reqValid = !reset && (current_state == STATE_FETCH);
 
         assign io_lsu_reqValid = (current_state == STATE_MEM);
         wire [6:0] opcode = inst[6:0];
@@ -68,7 +68,7 @@ module top #(
 				localparam [11:0] CSR_MVENDORID = 12'hF11;
 				localparam [11:0] CSR_MARCHID = 12'hF12;
 				localparam [31:0] MVENDORID_VAL = 32'h79737978;
-				localparam [31:0] MARCHID_VAL = 32'd0;
+				localparam [31:0] MARCHID_VAL = 32'h00414255;
 				localparam [11:0] CSR_MCYCLE = 12'hb00;
 				localparam [11:0] CSR_MCYCLEH = 12'hB80;
 
@@ -109,8 +109,23 @@ module top #(
 				`ifndef SYNTHESIS
 					wire is_ebreak = (inst == 32'h00100073);
 					wire [31:0] a0_value  = rf_inst.rf[10];
-
-				`ifdef __ICARUS__
+				`ifdef OSOC_KIT
+        // OSOC user kit: report retired instructions and ebreak
+        // through the kit's own NPCTrap module (DPI set_commit).
+					reg        kit_valid, kit_ebreak;
+					reg [31:0] kit_code;
+					always @(posedge clock) begin
+                kit_valid  <= !reset && inst_retired;
+                kit_ebreak <= is_ebreak;
+                kit_code   <= a0_value;
+					end
+					NPCTrap npctrap (
+                .valid    (kit_valid),
+                .isEbreak (kit_ebreak),
+                .code     (kit_code),
+                .isMMIO   (1'b0)
+					);
+				`elsif __ICARUS__
 					always @(posedge clock) begin
 						if (!reset && is_ebreak && inst_retired) begin
 							if (a0_value == 32'b0) $display("\nHIT GOOD TRAP (after %0d cycles)", $time / 2);
