@@ -7,8 +7,10 @@ NVBOARD_HOME = /home/kali/ysyx-workbench/nvboard
 PDK_HOME     = /home/kali/icsprout55-pdk
 include $(NVBOARD_HOME)/scripts/nvboard.mk
 
-CORE_VSRCS = $(CORE)/vsrc/top.v $(CORE)/vsrc/RegisterFile.v
-NETLIST_V  = $(CORE)/netlist/top_netlist.v
+RTL       ?= vsrc
+CORE_VSRCS = $(wildcard $(CORE)/$(RTL)/*.v)
+SUFFIX     = $(if $(filter vsrc,$(RTL)),,_$(RTL))
+NETLIST_V  = $(CORE)/netlist/top_netlist$(SUFFIX).v
 PDK_CELLS  = $(foreach c,H7CH H7CR H7CL,$(PDK_HOME)/IP/STD_cell/ics55_LLSC_H7C_V1p10C100/ics55_LLSC_$(c)/verilog/ics55_LLSC_$(c).v)
 
 LINT_FLAGS = -Wno-DECLFILENAME -Wno-UNUSEDSIGNAL -Wno-PROCASSINIT -Wno-SYNCASYNCNET \
@@ -18,7 +20,7 @@ VFLAGS = --cc --exe --build -j 0 -Wall $(LINT_FLAGS)
 
 ifeq ($(SOC),1)
   TOP        = SimTop
-  OBJ_DIR    = obj_dir_soc
+  OBJ_DIR    = obj_dir_soc$(SUFFIX)
   VSRCS      = $(CORE_VSRCS) $(YSYXSOC_HOME)/ready-to-run/minirv/ElaborateTop.v \
                $(shell find $(YSYXSOC_HOME)/perip -name "*.v" -o -name "*.sv")
   CSRCS      = $(CORE)/soc/sim_main.cpp auto_bind.cpp $(NVBOARD_ARCHIVE)
@@ -32,11 +34,11 @@ else
   CSRCS      = $(CORE)/standalone/sim_main.cpp
   BUILD_DEPS =
   ifeq ($(NETLIST),1)
-    OBJ_DIR  = obj_dir_netlist
+    OBJ_DIR  = obj_dir_netlist$(SUFFIX)
     VSRCS    = $(NETLIST_V) $(PDK_CELLS) $(CORE)/standalone/NpcSim.v
     VFLAGS  += --timescale "1ns/1ns" --no-timing -D__VERILATOR__ -Dfunctional -DNETLIST -Wno-fatal
   else
-    OBJ_DIR  = obj_dir_npc
+    OBJ_DIR  = obj_dir_npc$(SUFFIX)
     VSRCS    = $(CORE_VSRCS) $(CORE)/standalone/NpcSim.v
   endif
 endif

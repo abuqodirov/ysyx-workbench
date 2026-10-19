@@ -154,6 +154,47 @@ index 0000000..580b243
 +  putstr("done\n");
 +  return 0;
 +}
+diff --git a/tests/ddpwm-smoke/Makefile b/tests/ddpwm-smoke/Makefile
+new file mode 100644
+index 0000000..a1525b7
+--- /dev/null
++++ b/tests/ddpwm-smoke/Makefile
+@@ -0,0 +1,3 @@
++NAME = ddpwm-smoke
++SRCS = ddpwm-smoke.c
++include $(AM_HOME)/Makefile
+diff --git a/tests/ddpwm-smoke/ddpwm-smoke.c b/tests/ddpwm-smoke/ddpwm-smoke.c
+new file mode 100644
+index 0000000..8faccd9
+--- /dev/null
++++ b/tests/ddpwm-smoke/ddpwm-smoke.c
+@@ -0,0 +1,26 @@
++#include <am.h>
++#include <klib.h>
++
++#define CSRW(csr, v) asm volatile ("csrw " #csr ", %0" :: "r"(v))
++#define CSRR(csr)    ({ uint32_t _v; asm volatile ("csrr %0, " #csr : "=r"(_v)); _v; })
++#define GPIO_PADDIR  (*(volatile uint32_t *)0x10100000)
++
++int main(const char *args) {
++  GPIO_PADDIR = 0x3;                                  // pins 0 (PWM) and 1 (sync) are outputs
++  CSRW(0x7c1, 5 | (4 << 4) | (0 << 8) | (1 << 13));   // CFG: N=5, M=4, PWM pin 0, sync pin 1
++  CSRW(0x7c2, 400);                                   // PERIOD: T = 400 clocks
++  CSRW(0x7c3, 12);                                    // STEP: L = 12, offset 0
++  CSRW(0x7c4, 293 << 7);                              // DUTY = 293/512 -> n = 18, m = 5
++  CSRW(0x7c0, 1 | (1 << 2) | (1 << 6));               // CTRL: EN, dyadic, sync every period
++
++  while (!(CSRR(0x7c8) & (1 << 5)));                  // wait until periods run (STAT bit 5)
++  CSRW(0x7c7, 3);                                     // SLEEP: no fetch for 3 periods
++  uint32_t st = CSRR(0x7c8);
++  uint32_t c = (st >> 8) & 0xff, h = st >> 16;
++
++  CSRW(0x7c0, 0);                                     // stop
++  while (CSRR(0x7c8) & 1);                            // until the engine is off (STAT bit 0)
++
++  printf("DDPWM smoke: frames counter c=%d, H=%d\n", c, h);
++  return (c >= 3 && (h == 216 || h == 228)) ? 0 : 1;  // H = (18 + b) * 12, b = 0 or 1
++}
 diff --git a/tests/student-id/Makefile b/tests/student-id/Makefile
 new file mode 100644
 index 0000000..a0b66d9
