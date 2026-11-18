@@ -1,0 +1,43 @@
+{
+    "PDK": "ics55",
+    "Design": "ysyx_npc_ddpwm",
+    "Top module": "top",
+    "Die": {
+        "Size": [
+            214.6,
+            215.4
+        ],
+        "Area": 46224.84
+    },
+    "Core": {
+        "Size": [
+            210.6,
+            211.4
+        ],
+        "Area": 44520.84,
+        "Bounding box": "(2 , 2) (212.6 , 213.4)",
+        "Utilitization": 0.5,
+        "Margin": [
+            2,
+            2
+        ],
+        "Aspect ratio": 0.9962859795728876
+    },
+    "Max fanout": 32,
+    "Target density": 0.2,
+    "Target overflow": 0.1,
+    "Global right padding": 0,
+    "Cell padding x": 300,
+    "Routability opt flag": 1,
+    "Clock": "clock",
+    "Frequency max [MHz]": 40,
+    "Bottom layer": "MET2",
+    "Top layer": "MET5",
+    "STA max paths": 1000,
+    "Die Area": {
+        "mode": "utilitization_margin",
+        "utilitization": 0.5,
+        "margin": 2
+    },
+    "PDK Root": "/home/kali/icsprout55-pdk"
+}

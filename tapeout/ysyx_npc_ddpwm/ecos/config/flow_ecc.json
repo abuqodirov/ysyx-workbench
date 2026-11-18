@@ -1,0 +1,9 @@
+{
+    "ConfigPath": {
+        "idb_path": "/home/kali/ecos/projects/ddpwm/ddpwm40/config/db_ecc.json",
+        "ifp_path": "/home/kali/ecos/projects/ddpwm/ddpwm40/config/floorplan_ecc.json",
+        "irt_path": "/home/kali/ecos/projects/ddpwm/ddpwm40/config/route_ecc.json",
+        "idrc_path": "/home/kali/ecos/projects/ddpwm/ddpwm40/config/drc_ecc.json",
+        "icts_path": "/home/kali/ecos/projects/ddpwm/ddpwm40/config/cts_ecc.json"
+    }
+}

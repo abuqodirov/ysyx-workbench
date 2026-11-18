@@ -27,4 +27,5 @@ icsprout55-pdk/
 verilator/
 !my-patches/
 !my-patches/**
+!/tapeout/**
 !SETUP.md
